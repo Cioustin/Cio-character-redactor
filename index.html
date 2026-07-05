@@ -1,0 +1,2290 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Character Redactor - Igor Edition</title>
+    <!-- Библиотека для экспорта HTML в картинку PNG -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* Импорт пиксельных шрифтов */
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+        /* Инициализация CSS-переменных по умолчанию (Тема Мульти) */
+        :root {
+            --primary: #00ff66;
+            --secondary: #ff3344;
+            --tertiary: #00a2ff;
+            --shadow-1: #ff003c;
+            --shadow-2: #00f0ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
+            image-rendering: pixelated;
+        }
+
+        body {
+            background-color: #050505;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Задний фон с матрицей */
+        #binaryCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Эффект старого CRT-монитора */
+        body::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        /* Панель управления (вверху справа) */
+        .header-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 10000;
+        }
+
+        .binary-toggle-btn, .theme-toggle-btn {
+            background: #111111;
+            color: var(--primary);
+            border: 3px solid var(--primary);
+            padding: 8px 12px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px #000;
+            transition: 0.1s;
+        }
+
+        .binary-toggle-btn:hover, .theme-toggle-btn:hover {
+            background: var(--primary);
+            color: #000000;
+        }
+
+        /* Заголовок */
+        header {
+            margin-bottom: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .logo-text {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 2.2rem;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: -2px;
+            margin: 0;
+            position: relative;
+            display: inline-block;
+            text-shadow: 
+                -3px -3px 0 var(--shadow-1),  
+                 3px  3px 0 var(--shadow-2);
+            animation: glitch 3s infinite;
+        }
+
+        @keyframes glitch {
+            0% { text-shadow: -3px -3px 0 var(--shadow-1), 3px 3px 0 var(--shadow-2); }
+            49% { text-shadow: -3px -3px 0 var(--shadow-1), 3px 3px 0 var(--shadow-2); }
+            50% { text-shadow: 3px -3px 0 var(--shadow-1), -3px 3px 0 var(--shadow-2); }
+            55% { text-shadow: -3px 3px 0 var(--shadow-1), 3px -3px 0 var(--shadow-2); }
+            56% { text-shadow: -3px -3px 0 var(--shadow-1), 3px 3px 0 var(--shadow-2); }
+            100% { text-shadow: -3px -3px 0 var(--shadow-1), 3px 3px 0 var(--shadow-2); }
+        }
+
+        .sub-logo {
+            font-size: 14px;
+            color: #888888;
+            margin-top: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Главный контейнер */
+        .container {
+            width: 100%;
+            max-width: 780px;
+            background: #111111;
+            border: 6px double #444444;
+            box-shadow: 0px 0px 25px rgba(0, 0, 0, 0.8);
+            border-radius: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Вкладки */
+        .tabs-bar {
+            background: #090909;
+            border-bottom: 4px solid #444444;
+            display: flex;
+            flex-wrap: wrap;
+            padding: 8px 8px 0 8px;
+            gap: 6px;
+        }
+
+        .tab {
+            background: #1a1a1a;
+            border: 3px solid #333333;
+            border-bottom: none;
+            padding: 10px 16px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            color: #888888;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tab:hover {
+            background: #222222;
+            color: #ffffff;
+            border-color: #555555;
+        }
+
+        .tab.active {
+            background: #111111;
+            color: var(--primary);
+            border-color: #444444;
+            border-bottom: 3px solid #111111;
+            margin-bottom: -4px;
+            z-index: 2;
+        }
+
+        .add-tab-btn {
+            background: #2a080c;
+            color: #ff3344;
+            border: 3px solid #5a1018;
+            border-bottom: none;
+            padding: 10px 16px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+
+        .add-tab-btn:hover {
+            background: #4a1017;
+            color: #ffffff;
+            box-shadow: 0 0 8px rgba(255, 51, 68, 0.5);
+        }
+
+        .tab-close {
+            background: #330000;
+            color: #ff3333;
+            border: 1px solid #ff3333;
+            font-size: 10px;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .tab-close:hover {
+            background: #ff3333;
+            color: #000000;
+        }
+
+        /* Область редактора */
+        .editor-content {
+            background: #111111;
+            padding: 24px;
+            display: none;
+        }
+
+        .editor-content.active {
+            display: block;
+        }
+
+        /* Поля ввода */
+        input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            border: 3px solid #333333;
+            padding: 10px;
+            font-size: 16px;
+            background: #080808;
+            color: var(--primary);
+            outline: none;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 8px var(--primary);
+        }
+
+        /* Имя персонажа */
+        .char-title-container {
+            margin-bottom: 20px;
+        }
+        
+        .char-title-input {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 16px !important;
+            color: #ffffff !important;
+            border: 3px solid #444444 !important;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        /* Секции */
+        .section-box {
+            border: 3px solid #333333;
+            padding: 16px;
+            margin-bottom: 20px;
+            background: #161616;
+        }
+
+        .section-box.red-zone {
+            border-color: var(--secondary);
+            background: #1c1113;
+        }
+
+        .section-box.blue-zone {
+            border-color: var(--tertiary);
+            background: #11161c;
+        }
+
+        .section-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+            color: #888888;
+            text-transform: uppercase;
+        }
+
+        .red-zone .section-title { color: var(--secondary); }
+        .blue-zone .section-title { color: var(--tertiary); }
+
+        .section-box textarea {
+            min-height: 95px;
+            resize: vertical;
+        }
+
+        /* Сетка внешнего вида */
+        .appearance-grid {
+            display: flex;
+            gap: 20px;
+        }
+
+        .appearance-desc {
+            flex: 1;
+            min-height: 200px;
+            resize: vertical;
+        }
+
+        /* Контейнер для загрузчика и кнопок управления */
+        .photo-control-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        /* КРУПНЫЙ Портрет Персонажа */
+        .image-uploader-large {
+            width: 260px;
+            height: 360px;
+            border: 4px dashed #444444;
+            background: #020202;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.25s ease;
+        }
+
+        .image-uploader-large:hover {
+            border-color: var(--tertiary);
+            box-shadow: 0 0 15px var(--tertiary);
+        }
+
+        .image-uploader-large img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background-color: #050505;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .uploader-placeholder-large {
+            text-align: center;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            color: #555555;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            line-height: 1.5;
+        }
+
+        .glitch-face-icon-large {
+            width: 80px;
+            height: 80px;
+            opacity: 0.3;
+            fill: #ffffff;
+        }
+
+        /* Кнопка приближения (Zoom) */
+        .zoom-btn {
+            background: #111111;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            padding: 6px 12px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0px #000;
+            transition: 0.1s;
+            width: 100%;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .zoom-btn:hover {
+            background: var(--primary);
+            color: #000000;
+        }
+
+        .zoom-btn:disabled {
+            border-color: #444444;
+            color: #444444;
+            cursor: not-allowed;
+            box-shadow: none;
+            background: #111111;
+        }
+
+        /* Способности / Прокачка */
+        .abilities-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 14px;
+            color: var(--secondary);
+            margin: 25px 0 15px 0;
+            border-bottom: 3px double #444444;
+            padding-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .ability-item {
+            display: flex;
+            gap: 12px;
+            border: 3px solid #333333;
+            background: #151515;
+            padding: 12px;
+            margin-bottom: 16px;
+            position: relative;
+        }
+
+        .ability-photo-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 80px;
+            flex-shrink: 0;
+        }
+
+        .ability-image-uploader {
+            width: 80px;
+            height: 80px;
+            border: 3px solid #444444;
+            background: #080808;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ability-image-uploader img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .ability-zoom-btn {
+            font-size: 6px;
+            padding: 4px;
+        }
+
+        .ability-inputs {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .ability-name-input {
+            height: 32px;
+            font-size: 14px;
+            border-color: #444444;
+        }
+
+        .ability-desc-input {
+            flex-grow: 1;
+            min-height: 48px;
+            resize: vertical;
+            font-size: 13px;
+            border-color: #444444;
+        }
+
+        .delete-ability-btn {
+            background: #3a080c;
+            color: #ff3344;
+            border: 3px solid #5a1018;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            cursor: pointer;
+            padding: 0 10px;
+            height: 32px;
+            align-self: flex-start;
+            transition: 0.1s;
+        }
+
+        .delete-ability-btn:hover {
+            background: #ff3344;
+            color: #000000;
+        }
+
+        /* Шаблон Товер Дефенса (Стили Прокачки) */
+        .level-badge {
+            width: 80px;
+            height: 80px;
+            background: #1a1a1a;
+            border: 3px solid var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            color: var(--primary);
+            text-align: center;
+            flex-shrink: 0;
+            box-shadow: inset 0 0 10px rgba(0, 255, 102, 0.2);
+        }
+
+        .td-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin: 4px 0;
+        }
+
+        .td-stat-box {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .td-stat-label {
+            font-size: 11px;
+            color: #888888;
+            text-transform: uppercase;
+        }
+
+        .td-stat-input {
+            height: 28px !important;
+            padding: 4px !important;
+            font-size: 12px !important;
+        }
+
+        .td-upgrade-header {
+            display: flex;
+            gap: 8px;
+        }
+
+        .td-cost-input-wrapper {
+            position: relative;
+            width: 120px;
+            flex-shrink: 0;
+        }
+
+        .td-cost-input-wrapper input {
+            padding-right: 25px;
+        }
+
+        .td-cost-input-wrapper::after {
+            content: "$";
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--secondary);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+        }
+
+        /* Чекбоксы доп способностей */
+        .td-detection-box {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 6px;
+            border: 2px solid #333;
+            background: #090909;
+            width: 100%;
+        }
+
+        .detection-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 11px;
+            user-select: none;
+        }
+
+        .detection-toggle span.checkbox-ui {
+            color: var(--secondary);
+            font-weight: bold;
+        }
+
+        .detection-toggle.active span.checkbox-ui {
+            color: var(--primary);
+        }
+
+        /* Блок ДПС */
+        .td-dps-column {
+            width: 100px;
+            border-left: 3px double #333333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            flex-shrink: 0;
+            padding: 8px;
+        }
+
+        .td-dps-label {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            color: var(--secondary);
+            margin-bottom: 6px;
+        }
+
+        .td-dps-value {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 16px;
+            color: var(--primary);
+            text-shadow: 0 0 5px rgba(0, 255, 102, 0.5);
+        }
+
+        /* Вложенная Способность внутри уровня TD */
+        .lvl-ability-item {
+            display: flex;
+            gap: 12px;
+            border: 2px dashed var(--primary);
+            background: #080808;
+            padding: 8px;
+            margin-top: 6px;
+            position: relative;
+            width: 100%;
+        }
+
+        .add-lvl-ability-btn {
+            background: #111111;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 7px;
+            padding: 4px 6px;
+            cursor: pointer;
+            margin-top: 8px;
+            text-transform: uppercase;
+            width: 100%;
+            transition: 0.1s;
+        }
+
+        .add-lvl-ability-btn:hover {
+            background: var(--primary);
+            color: #000000;
+        }
+
+        /* Добавить способность / Прокачку */
+        .add-ability-container {
+            margin-top: 20px;
+        }
+
+        .add-ability-btn {
+            background: #111111;
+            color: var(--primary);
+            border: 3px solid var(--primary);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            padding: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: 0.1s;
+            width: 100%;
+            justify-content: center;
+            text-transform: uppercase;
+        }
+
+        .add-ability-btn:hover {
+            background: var(--primary);
+            color: #000000;
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        /* КНОПКА ЭКСПОРТА АНКЕТЫ */
+        .actions-row {
+            margin-top: 30px;
+            border-top: 4px double #444444;
+            padding-top: 24px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .export-card-btn {
+            background: var(--secondary);
+            color: #ffffff;
+            border: 4px solid #ffffff;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            padding: 18px 24px;
+            cursor: pointer;
+            box-shadow: 6px 6px 0px #000;
+            transition: 0.1s;
+            text-transform: uppercase;
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .export-card-btn:hover {
+            background: var(--primary);
+            color: #000000;
+            border-color: #000000;
+            box-shadow: 8px 8px 0px var(--secondary);
+            transform: translate(-2px, -2px);
+        }
+
+        /* ДИАЛОГ ВЫБОРА ТИПА ПЕРСОНАЖА (MODAL) */
+        .type-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 30000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .type-modal-content {
+            background: #111;
+            border: 6px double #444444;
+            padding: 30px;
+            width: 90%;
+            max-width: 480px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0,255,102,0.2);
+        }
+
+        .type-modal-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            color: var(--primary);
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            line-height: 1.6;
+        }
+
+        .type-btn {
+            background: #2a080c;
+            color: #ff3344;
+            border: 3px solid #5a1018;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            padding: 16px;
+            width: 100%;
+            margin-bottom: 12px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.1s;
+        }
+
+        .type-btn:hover {
+            background: var(--primary);
+            color: #000000;
+            border-color: #ffffff;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .type-btn-close {
+            background: #222;
+            color: #888;
+            border: 2px solid #444;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            padding: 10px;
+            cursor: pointer;
+            margin-top: 10px;
+            text-transform: uppercase;
+        }
+
+        .type-btn-close:hover {
+            background: #333;
+            color: #fff;
+        }
+
+        /* МОДАЛЬНОЕ ОКНО ПРИБЛИЖЕНИЯ */
+        .zoom-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 20000;
+            justify-content: center;
+            align-items: center;
+            cursor: zoom-out;
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .zoom-modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            border: 6px double var(--primary);
+            box-shadow: 0 0 30px var(--primary);
+            background: #111;
+            object-fit: contain;
+        }
+
+        /* Скрытые инпуты */
+        .file-input {
+            display: none;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 680px) {
+            .appearance-grid {
+                flex-direction: column-reverse;
+                align-items: center;
+            }
+            .image-uploader-large {
+                width: 100%;
+                max-width: 320px;
+                height: 380px;
+            }
+            .header-controls {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+            }
+            .ability-item {
+                flex-direction: column;
+            }
+            .td-dps-column {
+                width: 100%;
+                border-left: none;
+                border-top: 3px double #333333;
+                padding-top: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Канвас матрицы -->
+    <canvas id="binaryCanvas"></canvas>
+
+    <!-- Панель управления (вверху справа) -->
+    <div class="header-controls">
+        <button id="themeToggle" class="theme-toggle-btn" onclick="nextTheme()">[ ПАЛИТРА: МУЛЬТИ ]</button>
+        <button id="binaryToggle" class="binary-toggle-btn">[ MATRIX: ON ]</button>
+    </div>
+
+    <header>
+        <h1 class="logo-text">Character Redactor</h1>
+        <div class="sub-logo">[ system state: corrupted ]</div>
+    </header>
+
+    <div class="container">
+        <!-- Вкладки -->
+        <div class="tabs-bar" id="tabsBar">
+            <button class="add-tab-btn" onclick="openTypeModal()">+ ПЕРС</button>
+        </div>
+
+        <!-- Контейнер для редакторов -->
+        <div id="editorsContainer"></div>
+    </div>
+
+    <!-- Модалка выбора типа персонажа -->
+    <div id="typeModal" class="type-modal">
+        <div class="type-modal-content">
+            <div class="type-modal-title">ВЫБЕРИТЕ ТИП СУБЪЕКТА</div>
+            <button class="type-btn" onclick="addNewCharacter('asim')">🧬 Асим (Персонаж)</button>
+            <button class="type-btn" onclick="addNewCharacter('td')">🏰 Товер Дефенс (Башня)</button>
+            <button class="type-btn-close" onclick="closeTypeModal()">Отмена</button>
+        </div>
+    </div>
+
+    <!-- Модалка зума картинок -->
+    <div id="zoomModal" class="zoom-modal" onclick="closeZoom()">
+        <img id="zoomModalImg" class="zoom-modal-content" src="" alt="Zoomed image">
+    </div>
+
+    <!-- Заготовка жуткого глитч-лица (большая) -->
+    <svg id="defaultSmileLarge" style="display:none;">
+        <svg viewBox="0 0 100 100" class="glitch-face-icon-large">
+            <rect x="22" y="28" width="16" height="24" fill="#444444"/>
+            <rect x="62" y="28" width="16" height="24" fill="#444444"/>
+            <path d="M 15 65 L 30 78 L 70 78 L 85 65" fill="none" stroke="#444444" stroke-width="6" stroke-linecap="square"/>
+            <rect x="5" y="48" width="90" height="4" fill="#ff3344" opacity="0.3"/>
+            <rect x="15" y="15" width="50" height="5" fill="#00f0ff" opacity="0.3"/>
+        </svg>
+    </svg>
+
+    <!-- Заготовка глитч-лица (маленькая) -->
+    <svg id="defaultSmileSmall" style="display:none;">
+        <svg viewBox="0 0 100 100" style="width:40px; height:40px; opacity:0.3; fill:#fff;">
+            <rect x="25" y="30" width="12" height="18" fill="#444444"/>
+            <rect x="63" y="30" width="12" height="18" fill="#444444"/>
+            <path d="M 20 65 L 30 75 L 70 75 L 80 65" fill="none" stroke="#444444" stroke-width="6" stroke-linecap="square"/>
+        </svg>
+    </svg>
+
+    <script>
+        // Иконка-заглушка 1x1 пиксель (для экономии трафика и исключения сбоев памяти)
+        const IGOR_PHOTO_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+        let characters = [];
+        let activeCharId = null;
+
+        // --- КОНФИГУРАЦИЯ ЦВЕТОВЫХ ПАЛИТР ---
+        const themeKeys = ['multi', 'white', 'purple', 'pink', 'green', 'red'];
+        const themes = {
+            multi: {
+                primary: '#00ff66', secondary: '#ff3344', tertiary: '#00a2ff',
+                shadow1: '#ff003c', shadow2: '#00f0ff', name: 'МУЛЬТИ'
+            },
+            white: {
+                primary: '#ffffff', secondary: '#cccccc', tertiary: '#888888',
+                shadow1: '#555555', shadow2: '#aaaaaa', name: 'БЕЛЫЙ'
+            },
+            purple: {
+                primary: '#b026ff', secondary: '#9400d3', tertiary: '#da70d6',
+                shadow1: '#4b0082', shadow2: '#ba55d3', name: 'ФИОЛЕТОВЫЙ'
+            },
+            pink: {
+                primary: '#ff007f', secondary: '#ff1493', tertiary: '#ff69b4',
+                shadow1: '#c71585', shadow2: '#ffb6c1', name: 'РОЗОВЫЙ'
+            },
+            green: {
+                primary: '#00ff66', secondary: '#00aa00', tertiary: '#32cd32',
+                shadow1: '#004d00', shadow2: '#8fbc8f', name: 'ЗЕЛЕНЫЙ'
+            },
+            red: {
+                primary: '#ff3344', secondary: '#ff0000', tertiary: '#cd5c5c',
+                shadow1: '#8b0000', shadow2: '#fa8072', name: 'КРАСНЫЙ'
+            }
+        };
+
+        function applyTheme(themeKey) {
+            const theme = themes[themeKey];
+            if (!theme) return;
+            const root = document.documentElement;
+            root.style.setProperty('--primary', theme.primary);
+            root.style.setProperty('--secondary', theme.secondary);
+            root.style.setProperty('--tertiary', theme.tertiary);
+            root.style.setProperty('--shadow-1', theme.shadow1);
+            root.style.setProperty('--shadow-2', theme.shadow2);
+            
+            document.getElementById('themeToggle').innerText = `[ ПАЛИТРА: ${theme.name} ]`;
+            localStorage.setItem('selected_theme', themeKey);
+        }
+
+        function nextTheme() {
+            let current = localStorage.getItem('selected_theme') || 'multi';
+            let idx = themeKeys.indexOf(current);
+            let nextIdx = (idx + 1) % themeKeys.length;
+            applyTheme(themeKeys[nextIdx]);
+        }
+
+
+        // --- ЛОГИКА ДВОИЧНОЙ МАТРИЦЫ ---
+        const canvas = document.getElementById('binaryCanvas');
+        const ctx = canvas.getContext('2d');
+        let animationFrameId;
+        let binaryActive = true;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const fontSize = 16;
+        let columns = canvas.width / fontSize;
+        let drops = [];
+        for(let x = 0; x < columns; x++) drops[x] = 1;
+
+        function drawBinary() {
+            if (!binaryActive) return;
+            
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.08)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const activeThemeKey = localStorage.getItem('selected_theme') || 'multi';
+            const themeObj = themes[activeThemeKey];
+            
+            ctx.fillStyle = themeObj ? themeObj.primary : '#00ff66';
+            ctx.globalAlpha = 0.15;
+            ctx.font = fontSize + 'px "Share Tech Mono"';
+
+            columns = canvas.width / fontSize;
+            while (drops.length < columns) drops.push(1);
+
+            for(let i = 0; i < drops.length; i++) {
+                const text = Math.random() > 0.5 ? "1" : "0";
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                if(drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+            ctx.globalAlpha = 1.0;
+            animationFrameId = requestAnimationFrame(drawBinary);
+        }
+
+        const toggleBtn = document.getElementById('binaryToggle');
+        const savedMatrixState = localStorage.getItem('binary_matrix_active');
+        if (savedMatrixState === 'false') {
+            binaryActive = false;
+            toggleBtn.innerText = '[ MATRIX: OFF ]';
+            toggleBtn.style.color = '#888888';
+            toggleBtn.style.borderColor = '#444444';
+        } else {
+            drawBinary();
+        }
+
+        toggleBtn.onclick = () => {
+            binaryActive = !binaryActive;
+            if (binaryActive) {
+                toggleBtn.innerText = '[ MATRIX: ON ]';
+                toggleBtn.style.color = 'var(--primary)';
+                toggleBtn.style.borderColor = 'var(--primary)';
+                ctx.fillStyle = '#050505';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                drawBinary();
+            } else {
+                toggleBtn.innerText = '[ MATRIX: OFF ]';
+                toggleBtn.style.color = '#888888';
+                toggleBtn.style.borderColor = '#444444';
+                cancelAnimationFrame(animationFrameId);
+                ctx.fillStyle = '#050505';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            localStorage.setItem('binary_matrix_active', binaryActive);
+        };
+
+
+        // --- ЛОГИКА ЗУМА (ПРИБЛИЖЕНИЯ) ФОТО ---
+        function zoomImage(imgSrc) {
+            if (!imgSrc) return;
+            const modal = document.getElementById('zoomModal');
+            const modalImg = document.getElementById('zoomModalImg');
+            modalImg.src = imgSrc;
+            modal.style.display = 'flex';
+        }
+
+        function closeZoom() {
+            document.getElementById('zoomModal').style.display = 'none';
+        }
+
+
+        // --- ОТКРЫТИЕ/ЗАКРЫТИЕ МОДАЛКИ ВЫБОРА ТИПА ---
+        function openTypeModal() {
+            document.getElementById('typeModal').style.display = 'flex';
+        }
+
+        function closeTypeModal() {
+            document.getElementById('typeModal').style.display = 'none';
+        }
+
+
+        // --- ЛОГИКА ЭКСПОРТА АНКЕТЫ В PNG ---
+        async function exportCharacterSheet(charId) {
+            const char = characters.find(c => c.id === charId);
+            if (!char) return;
+
+            const btn = document.getElementById(`export-btn-${charId}`);
+            const originalText = btn.innerText;
+            btn.innerText = "ГЕНЕРАЦИЯ...";
+            btn.disabled = true;
+
+            try {
+                const exportArea = document.createElement('div');
+                exportArea.style.position = 'absolute';
+                exportArea.style.left = '-9999px';
+                exportArea.style.width = '750px';
+                exportArea.style.background = '#111111';
+                exportArea.style.border = '10px double #444444';
+                exportArea.style.padding = '30px';
+                exportArea.style.color = '#ffffff';
+                exportArea.style.display = 'flex';
+                exportArea.style.flexDirection = 'column';
+                exportArea.style.gap = '20px';
+
+                const activeThemeKey = localStorage.getItem('selected_theme') || 'multi';
+                const theme = themes[activeThemeKey];
+                exportArea.style.setProperty('--primary', theme.primary);
+                exportArea.style.setProperty('--secondary', theme.secondary);
+                exportArea.style.setProperty('--tertiary', theme.tertiary);
+                exportArea.style.setProperty('--shadow-1', theme.shadow1);
+                exportArea.style.setProperty('--shadow-2', theme.shadow2);
+
+                const header = document.createElement('div');
+                header.style.textAlign = 'center';
+                header.style.borderBottom = '4px double var(--secondary)';
+                header.style.paddingBottom = '15px';
+                header.style.marginBottom = '10px';
+                header.innerHTML = `
+                    <div style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--secondary); margin-bottom: 8px;">
+                        ${char.type === 'td' ? 'TOWER DEFENSE UNIT SHEET' : 'CHARACTER DOSSIER'}
+                    </div>
+                    <div style="font-family: 'Press Start 2P', monospace; font-size: 24px; color: #ffffff; text-transform: uppercase;">
+                        ${char.name || 'UNKNOWN SUBJECT'}
+                    </div>
+                `;
+                exportArea.appendChild(header);
+
+                if (char.about) {
+                    const aboutBox = document.createElement('div');
+                    aboutBox.style.border = '3px solid var(--secondary)';
+                    aboutBox.style.background = '#1c1113';
+                    aboutBox.style.padding = '16px';
+                    aboutBox.innerHTML = `
+                        <div style="font-family: 'Press Start 2P', monospace; font-size: 11px; color: var(--secondary); margin-bottom: 8px; text-transform: uppercase;">
+                            ${char.type === 'td' ? 'Описание башни:' : 'О субъекте:'}
+                        </div>
+                        <div style="font-family: 'Share Tech Mono', monospace; font-size: 18px; color: var(--primary); white-space: pre-wrap; line-height: 1.4;">${char.about}</div>
+                    `;
+                    exportArea.appendChild(aboutBox);
+                }
+
+                const appBox = document.createElement('div');
+                appBox.style.border = '3px solid var(--tertiary)';
+                appBox.style.background = '#11161c';
+                appBox.style.padding = '16px';
+                
+                const appTitle = document.createElement('div');
+                appTitle.style.fontFamily = "'Press Start 2P', monospace";
+                appTitle.style.fontSize = "11px";
+                appTitle.style.color = "var(--tertiary)";
+                appTitle.style.marginBottom = "12px";
+                appTitle.style.textTransform = "uppercase";
+                appTitle.innerText = "Внешний вид:";
+                appBox.appendChild(appTitle);
+
+                const grid = document.createElement('div');
+                grid.style.display = 'flex';
+                grid.style.gap = '20px';
+
+                const desc = document.createElement('div');
+                desc.style.flex = '1';
+                desc.style.fontFamily = "'Share Tech Mono', monospace";
+                desc.style.fontSize = '18px';
+                desc.style.color = 'var(--primary)';
+                desc.style.whiteSpace = 'pre-wrap';
+                desc.style.lineHeight = '1.4';
+                desc.innerText = char.appearanceDesc || "Описание отсутствует.";
+                grid.appendChild(desc);
+
+                const imgContainer = document.createElement('div');
+                imgContainer.style.width = '260px';
+                imgContainer.style.height = '360px';
+                imgContainer.style.border = '3px solid #444444';
+                imgContainer.style.background = '#020202';
+                imgContainer.style.display = 'flex';
+                imgContainer.style.alignItems = 'center';
+                imgContainer.style.justifyContent = 'center';
+                imgContainer.style.overflow = 'hidden';
+
+                if (char.appearanceImg) {
+                    const img = document.createElement('img');
+                    img.src = char.appearanceImg;
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'contain';
+                    imgContainer.appendChild(img);
+                } else {
+                    imgContainer.innerHTML = `
+                        <div style="text-align: center; color: #444; font-family: 'Press Start 2P', monospace; font-size: 8px;">
+                            ${document.getElementById('defaultSmileLarge').innerHTML}
+                            <div style="margin-top: 10px;">НЕТ ФОТО</div>
+                        </div>
+                    `;
+                }
+                grid.appendChild(imgContainer);
+                appBox.appendChild(grid);
+                exportArea.appendChild(appBox);
+
+                if (char.type === 'td') {
+                    const abSection = document.createElement('div');
+                    
+                    const abTitle = document.createElement('div');
+                    abTitle.style.fontFamily = "'Press Start 2P', monospace";
+                    abTitle.style.fontSize = "14px";
+                    abTitle.style.color = "var(--secondary)";
+                    abTitle.style.margin = "15px 0 10px 0";
+                    abTitle.style.borderBottom = "3px double #444444";
+                    abTitle.style.paddingBottom = "8px";
+                    abTitle.style.textTransform = "uppercase";
+                    abTitle.innerText = "ПРОКАЧКА И ХАРАКТЕРИСТИКИ:";
+                    abSection.appendChild(abTitle);
+
+                    char.upgrades.forEach(upg => {
+                        const upgItem = document.createElement('div');
+                        upgItem.style.display = 'flex';
+                        upgItem.style.flexDirection = 'column';
+                        upgItem.style.border = '3px solid #333333';
+                        upgItem.style.background = '#151515';
+                        upgItem.style.padding = '12px';
+                        upgItem.style.marginBottom = '12px';
+
+                        const mainInfoRow = document.createElement('div');
+                        mainInfoRow.style.display = 'flex';
+                        mainInfoRow.style.gap = '12px';
+                        mainInfoRow.style.width = '100%';
+
+                        const lvlBadge = document.createElement('div');
+                        lvlBadge.style.width = '80px';
+                        lvlBadge.style.height = '80px';
+                        lvlBadge.style.background = '#1a1a1a';
+                        lvlBadge.style.border = '3px solid var(--primary)';
+                        lvlBadge.style.display = 'flex';
+                        lvlBadge.style.alignItems = 'center';
+                        lvlBadge.style.justifyContent = 'center';
+                        lvlBadge.style.flexDirection = 'column';
+                        lvlBadge.style.fontFamily = "'Press Start 2P', monospace";
+                        lvlBadge.style.fontSize = '10px';
+                        lvlBadge.style.color = 'var(--primary)';
+                        lvlBadge.style.textAlign = 'center';
+                        lvlBadge.innerHTML = `<span style="font-size:16px;">${upg.level}</span><span>LVL</span>`;
+                        mainInfoRow.appendChild(lvlBadge);
+
+                        const infoDiv = document.createElement('div');
+                        infoDiv.style.flex = '1';
+                        infoDiv.style.display = 'flex';
+                        infoDiv.style.flexDirection = 'column';
+                        infoDiv.style.gap = '6px';
+
+                        const nameLine = document.createElement('div');
+                        nameLine.style.fontFamily = "'Press Start 2P', monospace";
+                        nameLine.style.fontSize = "12px";
+                        nameLine.style.color = "#ffffff";
+                        nameLine.innerText = `${upg.name || 'БЕЗ НАЗВАНИЯ'} — Стоимость: ${upg.cost}$`;
+                        infoDiv.appendChild(nameLine);
+
+                        const statsLine = document.createElement('div');
+                        statsLine.style.fontFamily = "'Share Tech Mono', monospace";
+                        statsLine.style.fontSize = "16px";
+                        statsLine.style.color = "#888888";
+                        statsLine.innerHTML = `Урон: <span style="color:var(--primary);">${upg.damage}</span> | Скорострельность: <span style="color:var(--primary);">${upg.rate} c.</span> | Радиус: <span style="color:var(--primary);">${upg.range}</span>`;
+                        infoDiv.appendChild(statsLine);
+
+                        const descLine = document.createElement('div');
+                        descLine.style.fontFamily = "'Share Tech Mono', monospace";
+                        descLine.style.fontSize = "15px";
+                        descLine.style.color = "var(--primary)";
+                        descLine.innerText = upg.desc || "Эффект модификации отсутствует.";
+                        infoDiv.appendChild(descLine);
+
+                        const detectLine = document.createElement('div');
+                        detectLine.style.fontFamily = "'Press Start 2P', monospace";
+                        detectLine.style.fontSize = "8px";
+                        detectLine.style.marginTop = "4px";
+                        detectLine.innerHTML = `
+                            👁️ НЕВИДИМЫЕ: ${upg.seeCamo ? '<span style="color:var(--primary);">[АКТИВНО]</span>' : '<span style="color:var(--secondary);">[НЕТ]</span>'} | 
+                            🪶 ЛЕТАЮЩИЕ: ${upg.seeFlying ? '<span style="color:var(--primary);">[АКТИВНО]</span>' : '<span style="color:var(--secondary);">[НЕТ]</span>'}
+                        `;
+                        infoDiv.appendChild(detectLine);
+                        mainInfoRow.appendChild(infoDiv);
+
+                        const dpsVal = upg.rate > 0 ? (upg.damage / upg.rate).toFixed(1) : "0";
+                        const dpsDiv = document.createElement('div');
+                        dpsDiv.style.width = '100px';
+                        dpsDiv.style.borderLeft = '3px double #333';
+                        dpsDiv.style.display = 'flex';
+                        dpsDiv.style.flexDirection = 'column';
+                        dpsDiv.style.alignItems = 'center';
+                        dpsDiv.style.justifyContent = 'center';
+                        dpsDiv.innerHTML = `
+                            <div style="font-family:'Press Start 2P', monospace; font-size:8px; color:var(--secondary); margin-bottom:4px;">DPS</div>
+                            <div style="font-family:'Press Start 2P', monospace; font-size:14px; color:var(--primary);">${dpsVal}</div>
+                        `;
+                        mainInfoRow.appendChild(dpsDiv);
+                        upgItem.appendChild(mainInfoRow);
+
+                        if (upg.abilities && upg.abilities.length > 0) {
+                            const exportAbContainer = document.createElement('div');
+                            exportAbContainer.style.width = '100%';
+                            exportAbContainer.style.borderTop = '2px dashed #333333';
+                            exportAbContainer.style.marginTop = '10px';
+                            exportAbContainer.style.paddingTop = '10px';
+                            exportAbContainer.style.display = 'flex';
+                            exportAbContainer.style.flexDirection = 'column';
+                            exportAbContainer.style.gap = '8px';
+
+                            upg.abilities.forEach(ab => {
+                                const exportAbRow = document.createElement('div');
+                                exportAbRow.style.display = 'flex';
+                                exportAbRow.style.gap = '12px';
+                                exportAbRow.style.border = '2px dashed var(--primary)';
+                                exportAbRow.style.background = '#0d0d0d';
+                                exportAbRow.style.padding = '8px';
+
+                                const exportAbImgCont = document.createElement('div');
+                                exportAbImgCont.style.width = '64px';
+                                exportAbImgCont.style.height = '64px';
+                                exportAbImgCont.style.border = '2px solid #444444';
+                                exportAbImgCont.style.background = '#080808';
+                                exportAbImgCont.style.display = 'flex';
+                                exportAbImgCont.style.alignItems = 'center';
+                                exportAbImgCont.style.justifyContent = 'center';
+                                exportAbImgCont.style.overflow = 'hidden';
+
+                                if (ab.img) {
+                                    const img = document.createElement('img');
+                                    img.src = ab.img;
+                                    img.style.width = '100%';
+                                    img.style.height = '100%';
+                                    img.style.objectFit = 'cover';
+                                    exportAbImgCont.appendChild(img);
+                                } else {
+                                    exportAbImgCont.innerHTML = `
+                                        <div style="text-align: center;">
+                                            ${document.getElementById('defaultSmileSmall').innerHTML}
+                                        </div>
+                                    `;
+                                }
+                                exportAbRow.appendChild(exportAbImgCont);
+
+                                const exportAbInfo = document.createElement('div');
+                                exportAbInfo.style.flex = '1';
+                                exportAbInfo.style.display = 'flex';
+                                exportAbInfo.style.flexDirection = 'column';
+                                exportAbInfo.style.gap = '4px';
+
+                                const exportAbName = document.createElement('div');
+                                exportAbName.style.fontFamily = "'Press Start 2P', monospace";
+                                exportAbName.style.fontSize = "10px";
+                                exportAbName.style.color = "#ffffff";
+                                exportAbName.innerText = ab.name || "СПОСОБНОСТЬ";
+
+                                const exportAbDesc = document.createElement('div');
+                                exportAbDesc.style.fontFamily = "'Share Tech Mono', monospace";
+                                exportAbDesc.style.fontSize = "14px";
+                                exportAbDesc.style.color = "var(--primary)";
+                                exportAbDesc.innerText = ab.desc || "Описание отсутствует.";
+
+                                exportAbInfo.appendChild(exportAbName);
+                                exportAbInfo.appendChild(exportAbDesc);
+                                exportAbRow.appendChild(exportAbInfo);
+
+                                exportAbContainer.appendChild(exportAbRow);
+                            });
+                            upgItem.appendChild(exportAbContainer);
+                        }
+
+                        abSection.appendChild(upgItem);
+                    });
+                    exportArea.appendChild(abSection);
+                } else {
+                    if (char.abilities && char.abilities.length > 0) {
+                        const abSection = document.createElement('div');
+                        
+                        const abTitle = document.createElement('div');
+                        abTitle.style.fontFamily = "'Press Start 2P', monospace";
+                        abTitle.style.fontSize = "14px";
+                        abTitle.style.color = "var(--secondary)";
+                        abTitle.style.margin = "15px 0 10px 0";
+                        abTitle.style.borderBottom = "3px double #444444";
+                        abTitle.style.paddingBottom = "8px";
+                        abTitle.style.textTransform = "uppercase";
+                        abTitle.innerText = "Способности / Аномалии:";
+                        abSection.appendChild(abTitle);
+
+                        char.abilities.forEach(ab => {
+                            const abItem = document.createElement('div');
+                            abItem.style.display = 'flex';
+                            abItem.style.gap = '12px';
+                            abItem.style.border = '3px solid #333333';
+                            abItem.style.background = '#151515';
+                            abItem.style.padding = '12px';
+                            abItem.style.marginBottom = '12px';
+
+                            const abImgCont = document.createElement('div');
+                            abImgCont.style.width = '80px';
+                            abImgCont.style.height = '80px';
+                            abImgCont.style.border = '3px solid #444444';
+                            abImgCont.style.background = '#080808';
+                            abImgCont.style.display = 'flex';
+                            abImgCont.style.alignItems = 'center';
+                            abImgCont.style.justifyContent = 'center';
+                            abImgCont.style.overflow = 'hidden';
+
+                            if (ab.img) {
+                                const img = document.createElement('img');
+                                img.src = ab.img;
+                                img.style.width = '100%';
+                                img.style.height = '100%';
+                                img.style.objectFit = 'cover';
+                                abImgCont.appendChild(img);
+                            } else {
+                                abImgCont.innerHTML = `
+                                    <div style="text-align: center;">
+                                        ${document.getElementById('defaultSmileSmall').innerHTML}
+                                    </div>
+                                `;
+                            }
+                            abItem.appendChild(abImgCont);
+
+                            const abInfo = document.createElement('div');
+                            abInfo.style.flex = '1';
+                            abInfo.style.display = 'flex';
+                            abInfo.style.flexDirection = 'column';
+                            abInfo.style.gap = '6px';
+
+                            const abName = document.createElement('div');
+                            abName.style.fontFamily = "'Press Start 2P', monospace";
+                            abName.style.fontSize = "11px";
+                            abName.style.color = "#ffffff";
+                            abName.innerText = ab.name || "БЕЗ НАЗВАНИЯ";
+                            
+                            const abDesc = document.createElement('div');
+                            abDesc.style.fontFamily = "'Share Tech Mono', monospace";
+                            abDesc.style.fontSize = "15px";
+                            abDesc.style.color = "var(--primary)";
+                            abDesc.innerText = ab.desc || "Описание отсутствует.";
+
+                            abInfo.appendChild(abName);
+                            abInfo.appendChild(abDesc);
+                            abItem.appendChild(abInfo);
+
+                            abSection.appendChild(abItem);
+                        });
+                        exportArea.appendChild(abSection);
+                    }
+                }
+
+                const footer = document.createElement('div');
+                footer.style.textAlign = 'center';
+                footer.style.fontSize = '8px';
+                footer.style.color = '#555555';
+                footer.style.fontFamily = "'Press Start 2P', monospace";
+                footer.style.marginTop = '15px';
+                footer.style.borderTop = '3px double #333333';
+                footer.style.paddingTop = '10px';
+                footer.innerText = "[ GENERATED BY CHARACTER REDACTOR ]";
+                exportArea.appendChild(footer);
+
+                document.body.appendChild(exportArea);
+
+                await new Promise(resolve => setTimeout(resolve, 400));
+
+                const canvas = await html2canvas(exportArea, {
+                    backgroundColor: '#111111',
+                    scale: 2, 
+                    useCORS: true,
+                    logging: false
+                });
+
+                const url = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${char.name.replace(/\s+/g, '_') || 'character'}_sheet.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                document.body.removeChild(exportArea);
+
+            } catch (err) {
+                console.error("Ошибка экспорта: ", err);
+                alert("Не удалось сохранить анкету!");
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+
+        // --- ЛОГИКА РЕДАКТОРА ---
+        function loadData() {
+            const savedTheme = localStorage.getItem('selected_theme') || 'multi';
+            applyTheme(savedTheme);
+
+            const saved = localStorage.getItem('dark_characters_v6_td_abs');
+            if (saved) {
+                characters = JSON.parse(saved);
+                
+                characters.forEach(char => {
+                    if (char.upgrades) {
+                        char.upgrades.forEach(upg => {
+                            if (!upg.abilities) upg.abilities = [];
+                        });
+                    }
+                });
+
+                if (characters.length > 0) {
+                    activeCharId = characters[0].id;
+                }
+            } else {
+                createIgorCharacter();
+            }
+            renderTabs();
+            renderEditors();
+        }
+
+        function saveData() {
+            localStorage.setItem('dark_characters_v6_td_abs', JSON.stringify(characters));
+        }
+
+        function createIgorCharacter() {
+            const igor = {
+                id: Date.now(),
+                type: 'asim',
+                name: "Игорёшка",
+                about: "Шашлычный герой",
+                appearanceDesc: "Носит каноничную белую кепку. В совершенстве владеет техникой одновременного удержания двух шампуров с сочным мясом.",
+                appearanceImg: IGOR_PHOTO_BASE64,
+                abilities: [
+                    {
+                        id: Date.now() + 1,
+                        name: "Двойной Шампур",
+                        desc: "Наносит сокрушительный удар по голоду. Радиус поражения — весь пикник.",
+                        img: ""
+                    }
+                ]
+            };
+            characters.push(igor);
+            activeCharId = igor.id;
+            saveData();
+        }
+
+        function addNewCharacter(type) {
+            closeTypeModal();
+            const newChar = {
+                id: Date.now(),
+                type: type,
+                name: type === 'td' ? "НОВАЯ_БАШНЯ" : "НОВЫЙ_СУБЪЕКТ",
+                about: "",
+                appearanceDesc: "",
+                appearanceImg: "",
+                abilities: [],
+                upgrades: type === 'td' ? [
+                    {
+                        id: Date.now() + 1,
+                        level: 0,
+                        name: "Установка башни", // Имя изменено с "Базовая стрельба" на "Установка башни"
+                        cost: 0,
+                        damage: 10,
+                        rate: 1.0,
+                        range: 6,
+                        desc: "Установка основы оборонительного сооружения.",
+                        seeCamo: false,
+                        seeFlying: false,
+                        abilities: []
+                    }
+                ] : []
+            };
+            characters.push(newChar);
+            activeCharId = newChar.id;
+            saveData();
+            renderTabs();
+            renderEditors();
+        }
+
+        function deleteCharacter(id, event) {
+            event.stopPropagation();
+            if (characters.length <= 1) {
+                alert("Нельзя уничтожить последнего субъекта.");
+                return;
+            }
+            if (confirm("Вы уверены, что хотите стереть этого субъекта?")) {
+                characters = characters.filter(c => c.id !== id);
+                if (activeCharId === id) {
+                    activeCharId = characters[0].id;
+                }
+                saveData();
+                renderTabs();
+                renderEditors();
+            }
+        }
+
+        function selectTab(id) {
+            activeCharId = id;
+            renderTabs();
+            renderEditors();
+        }
+
+        function renderTabs() {
+            const tabsBar = document.getElementById('tabsBar');
+            const oldTabs = tabsBar.querySelectorAll('.tab');
+            oldTabs.forEach(t => t.remove());
+
+            characters.forEach(char => {
+                const tab = document.createElement('div');
+                tab.className = `tab ${char.id === activeCharId ? 'active' : ''}`;
+                tab.onclick = () => selectTab(char.id);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.innerText = char.name || "NULL";
+                tab.appendChild(nameSpan);
+
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'tab-close';
+                closeBtn.innerHTML = 'X';
+                closeBtn.onclick = (e) => deleteCharacter(char.id, e);
+                tab.appendChild(closeBtn);
+
+                tabsBar.insertBefore(tab, tabsBar.querySelector('.add-tab-btn'));
+            });
+        }
+
+        function renderEditors() {
+            const container = document.getElementById('editorsContainer');
+            container.innerHTML = '';
+
+            const activeChar = characters.find(c => c.id === activeCharId);
+            if (!activeChar) return;
+
+            const isTD = activeChar.type === 'td';
+
+            const editor = document.createElement('div');
+            editor.className = 'editor-content active';
+
+            const titleContainer = document.createElement('div');
+            titleContainer.className = 'char-title-container';
+            titleContainer.innerHTML = `
+                <input type="text" class="char-title-input" placeholder="${isTD ? 'НАЗВАНИЕ БАШНИ' : 'ИМЯ СУБЪЕКТА'}" value="${activeChar.name}" oninput="updateField(${activeChar.id}, 'name', this.value)">
+            `;
+            editor.appendChild(titleContainer);
+
+            const aboutBox = document.createElement('div');
+            aboutBox.className = 'section-box red-zone';
+            aboutBox.innerHTML = `
+                <div class="section-title">${isTD ? 'Описание башни:' : 'О субъекте:'}</div>
+                <textarea placeholder="${isTD ? 'Напишите краткую роль или историю башни...' : 'Ввод дополнительных данных...'}" oninput="updateField(${activeChar.id}, 'about', this.value)">${activeChar.about}</textarea>
+            `;
+            editor.appendChild(aboutBox);
+
+            const appearanceBox = document.createElement('div');
+            appearanceBox.className = 'section-box blue-zone';
+            
+            const appTitle = document.createElement('div');
+            appTitle.className = 'section-title';
+            appTitle.innerText = "Внешний вид:";
+            appearanceBox.appendChild(appTitle);
+
+            const grid = document.createElement('div');
+            grid.className = 'appearance-grid';
+
+            const descTextarea = document.createElement('textarea');
+            descTextarea.className = 'appearance-desc';
+            descTextarea.placeholder = isTD ? 'Опишите форму, пушку башни на 0 уровне...' : 'Сигнатура внешности...';
+            descTextarea.value = activeChar.appearanceDesc;
+            descTextarea.oninput = (e) => updateField(activeChar.id, 'appearanceDesc', e.target.value);
+            grid.appendChild(descTextarea);
+
+            const photoControl = document.createElement('div');
+            photoControl.className = 'photo-control-container';
+
+            const uploader = document.createElement('div');
+            uploader.className = 'image-uploader-large';
+            uploader.onclick = () => document.getElementById(`file-char-${activeChar.id}`).click();
+
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.id = `file-char-${activeChar.id}`;
+            fileInput.className = 'file-input';
+            fileInput.accept = 'image/*';
+            fileInput.onchange = (e) => handleImageUpload(e, activeChar.id, 'appearanceImg');
+
+            if (activeChar.appearanceImg) {
+                uploader.innerHTML = `<img src="${activeChar.appearanceImg}" />`;
+            } else {
+                uploader.innerHTML = `
+                    <div class="uploader-placeholder-large">
+                        ${document.getElementById('defaultSmileLarge').innerHTML}
+                        <span>ЗАГРУЗИТЬ ПОРТРЕТ</span>
+                        <span style="font-size: 6px; color: #444;">[ ЛЮБЫЕ ФОТО ]</span>
+                    </div>
+                `;
+            }
+
+            const zoomButton = document.createElement('button');
+            zoomButton.className = 'zoom-btn';
+            zoomButton.innerText = '🔍 Приблизить';
+            zoomButton.disabled = !activeChar.appearanceImg;
+            zoomButton.onclick = () => zoomImage(activeChar.appearanceImg);
+            
+            photoControl.appendChild(uploader);
+            photoControl.appendChild(zoomButton);
+            grid.appendChild(photoControl);
+            grid.appendChild(fileInput);
+            appearanceBox.appendChild(grid);
+            editor.appendChild(appearanceBox);
+
+            if (isTD) {
+                const abTitle = document.createElement('div');
+                abTitle.className = 'abilities-title';
+                abTitle.innerText = "Уровни Прокачки Башни:";
+                editor.appendChild(abTitle);
+
+                const upgList = document.createElement('div');
+                activeChar.upgrades.forEach((upg, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'ability-item';
+                    item.style.flexDirection = 'column';
+
+                    const mainRow = document.createElement('div');
+                    mainRow.style.display = 'flex';
+                    mainRow.style.gap = '12px';
+                    mainRow.style.width = '100%';
+
+                    const leftCol = document.createElement('div');
+                    leftCol.className = 'ability-photo-wrapper';
+
+                    const lvlBadge = document.createElement('div');
+                    lvlBadge.className = 'level-badge';
+                    lvlBadge.innerHTML = `<span style="font-size: 16px; margin-bottom: 2px;">${upg.level}</span><span>LVL</span>`;
+                    leftCol.appendChild(lvlBadge);
+
+                    const detBox = document.createElement('div');
+                    detBox.className = 'td-detection-box';
+
+                    const toggleCamo = document.createElement('div');
+                    toggleCamo.className = `detection-toggle ${upg.seeCamo ? 'active' : ''}`;
+                    toggleCamo.innerHTML = `<span class="checkbox-ui">${upg.seeCamo ? '[✓]' : '[✗]'}</span>👁️ CAMO`;
+                    toggleCamo.onclick = () => {
+                        upg.seeCamo = !upg.seeCamo;
+                        saveData();
+                        renderEditors();
+                    };
+
+                    const toggleFlying = document.createElement('div');
+                    toggleFlying.className = `detection-toggle ${upg.seeFlying ? 'active' : ''}`;
+                    toggleFlying.innerHTML = `<span class="checkbox-ui">${upg.seeFlying ? '[✓]' : '[✗]'}</span>🪶 FLY`;
+                    toggleFlying.onclick = () => {
+                        upg.seeFlying = !upg.seeFlying;
+                        saveData();
+                        renderEditors();
+                    };
+
+                    detBox.appendChild(toggleCamo);
+                    detBox.appendChild(toggleFlying);
+                    leftCol.appendChild(detBox);
+
+                    const inputsDiv = document.createElement('div');
+                    inputsDiv.className = 'ability-inputs';
+
+                    const nameHeader = document.createElement('div');
+                    nameHeader.className = 'td-upgrade-header';
+
+                    const nameInput = document.createElement('input');
+                    nameInput.type = 'text';
+                    nameInput.className = 'ability-name-input';
+                    nameInput.placeholder = 'Название улучшения';
+                    nameInput.value = upg.name;
+                    nameInput.oninput = (e) => { upg.name = e.target.value; saveData(); };
+
+                    const costWrap = document.createElement('div');
+                    costWrap.className = 'td-cost-input-wrapper';
+                    const costInput = document.createElement('input');
+                    costInput.type = 'number';
+                    costInput.placeholder = 'Цена';
+                    // УБРАНО ограничение стоимости 0 уровня: поле больше не блокируется.
+                    costInput.value = upg.cost;
+                    costInput.oninput = (e) => { upg.cost = parseInt(e.target.value) || 0; saveData(); };
+                    costWrap.appendChild(costInput);
+
+                    nameHeader.appendChild(nameInput);
+                    nameHeader.appendChild(costWrap);
+                    inputsDiv.appendChild(nameHeader);
+
+                    const statsGrid = document.createElement('div');
+                    statsGrid.className = 'td-stats-grid';
+
+                    const statDmg = document.createElement('div');
+                    statDmg.className = 'td-stat-box';
+                    statDmg.innerHTML = `
+                        <span class="td-stat-label">Урон</span>
+                        <input type="number" class="td-stat-input" value="${upg.damage}" oninput="updateTDStat(${activeChar.id}, ${upg.id}, 'damage', this.value)">
+                    `;
+
+                    const statRate = document.createElement('div');
+                    statRate.className = 'td-stat-box';
+                    statRate.innerHTML = `
+                        <span class="td-stat-label">Кулдаун (с)</span>
+                        <input type="number" step="0.05" class="td-stat-input" value="${upg.rate}" oninput="updateTDStat(${activeChar.id}, ${upg.id}, 'rate', this.value)">
+                    `;
+
+                    const statRange = document.createElement('div');
+                    statRange.className = 'td-stat-box';
+                    statRange.innerHTML = `
+                        <span class="td-stat-label">Радиус</span>
+                        <input type="number" class="td-stat-input" value="${upg.range}" oninput="updateTDStat(${activeChar.id}, ${upg.id}, 'range', this.value)">
+                    `;
+
+                    statsGrid.appendChild(statDmg);
+                    statsGrid.appendChild(statRate);
+                    statsGrid.appendChild(statRange);
+                    inputsDiv.appendChild(statsGrid);
+
+                    const descInput = document.createElement('textarea');
+                    descInput.className = 'ability-desc-input';
+                    descInput.placeholder = 'Краткое описание эффекта улучшения...';
+                    descInput.value = upg.desc;
+                    descInput.oninput = (e) => { upg.desc = e.target.value; saveData(); };
+                    inputsDiv.appendChild(descInput);
+
+                    const dpsCol = document.createElement('div');
+                    dpsCol.className = 'td-dps-column';
+
+                    const dpsLabel = document.createElement('div');
+                    dpsLabel.className = 'td-dps-label';
+                    dpsLabel.innerText = "DPS";
+
+                    const currentDps = upg.rate > 0 ? (upg.damage / upg.rate).toFixed(1) : "0";
+                    const dpsValue = document.createElement('div');
+                    dpsValue.className = 'td-dps-value';
+                    dpsValue.id = `dps-${upg.id}`;
+                    dpsValue.innerText = currentDps;
+
+                    const addLvlAbBtn = document.createElement('button');
+                    addLvlAbBtn.className = 'add-lvl-ability-btn';
+                    addLvlAbBtn.innerText = '+ Способность';
+                    addLvlAbBtn.onclick = () => addTDLevelAbility(activeChar.id, upg.id);
+
+                    dpsCol.appendChild(dpsLabel);
+                    dpsCol.appendChild(dpsValue);
+                    dpsCol.appendChild(addLvlAbBtn);
+
+                    mainRow.appendChild(leftCol);
+                    mainRow.appendChild(inputsDiv);
+                    mainRow.appendChild(dpsCol);
+
+                    if (upg.level > 0) {
+                        const delBtn = document.createElement('button');
+                        delBtn.className = 'delete-ability-btn';
+                        delBtn.innerText = 'X';
+                        delBtn.style.marginLeft = '10px';
+                        delBtn.onclick = () => deleteTDLevel(activeChar.id, upg.id);
+                        mainRow.appendChild(delBtn);
+                    }
+                    item.appendChild(mainRow);
+
+                    if (upg.abilities && upg.abilities.length > 0) {
+                        const lvlAbsContainer = document.createElement('div');
+                        lvlAbsContainer.style.width = '100%';
+                        lvlAbsContainer.style.borderTop = '2px dashed #444444';
+                        lvlAbsContainer.style.marginTop = '10px';
+                        lvlAbsContainer.style.paddingTop = '10px';
+                        lvlAbsContainer.style.display = 'flex';
+                        lvlAbsContainer.style.flexDirection = 'column';
+                        lvlAbsContainer.style.gap = '8px';
+
+                        upg.abilities.forEach(ab => {
+                            const abItem = document.createElement('div');
+                            abItem.className = 'lvl-ability-item';
+
+                            const abPhotoWrapper = document.createElement('div');
+                            abPhotoWrapper.className = 'ability-photo-wrapper';
+                            abPhotoWrapper.style.width = '64px';
+
+                            const abUploader = document.createElement('div');
+                            abUploader.className = 'ability-image-uploader';
+                            abUploader.style.width = '64px';
+                            abUploader.style.height = '64px';
+                            abUploader.onclick = () => document.getElementById(`file-lvl-ab-${ab.id}`).click();
+
+                            const abFileInput = document.createElement('input');
+                            abFileInput.type = 'file';
+                            abFileInput.id = `file-lvl-ab-${ab.id}`;
+                            abFileInput.className = 'file-input';
+                            abFileInput.accept = 'image/*';
+                            abFileInput.onchange = (e) => handleTDLevelAbilityImageUpload(e, activeChar.id, upg.id, ab.id);
+
+                            if (ab.img) {
+                                abUploader.innerHTML = `<img src="${ab.img}" style="width:100%; height:100%; object-fit:cover;"/>`;
+                            } else {
+                                abUploader.innerHTML = `
+                                    <div style="text-align:center;" class="uploader-placeholder">
+                                        ${document.getElementById('defaultSmileSmall').innerHTML}
+                                        <span style="font-size:5px; color:#444; display:block;">IMG</span>
+                                    </div>
+                                `;
+                            }
+
+                            const abZoomBtn = document.createElement('button');
+                            abZoomBtn.className = 'zoom-btn ability-zoom-btn';
+                            abZoomBtn.innerText = 'ZOOM';
+                            abZoomBtn.style.fontSize = '5px';
+                            abZoomBtn.style.padding = '2px';
+                            abZoomBtn.disabled = !ab.img;
+                            abZoomBtn.onclick = () => zoomImage(ab.img);
+
+                            abPhotoWrapper.appendChild(abUploader);
+                            abPhotoWrapper.appendChild(abZoomBtn);
+
+                            const abInputs = document.createElement('div');
+                            abInputs.className = 'ability-inputs';
+
+                            const abNameInput = document.createElement('input');
+                            abNameInput.type = 'text';
+                            abNameInput.style.height = '28px';
+                            abNameInput.style.fontSize = '12px';
+                            abNameInput.placeholder = 'Название способности...';
+                            abNameInput.value = ab.name;
+                            abNameInput.oninput = (e) => updateTDLevelAbilityField(activeChar.id, upg.id, ab.id, 'name', e.target.value);
+
+                            const abDescInput = document.createElement('textarea');
+                            abDescInput.className = 'ability-desc-input';
+                            abDescInput.style.minHeight = '36px';
+                            abDescInput.style.fontSize = '11px';
+                            abDescInput.placeholder = 'Описание действия способности...';
+                            abDescInput.value = ab.desc;
+                            abDescInput.oninput = (e) => updateTDLevelAbilityField(activeChar.id, upg.id, ab.id, 'desc', e.target.value);
+
+                            abInputs.appendChild(abNameInput);
+                            abInputs.appendChild(abDescInput);
+
+                            const abDelBtn = document.createElement('button');
+                            abDelBtn.className = 'delete-ability-btn';
+                            abDelBtn.style.height = '28px';
+                            abDelBtn.style.fontSize = '8px';
+                            abDelBtn.innerText = 'X';
+                            abDelBtn.onclick = () => deleteTDLevelAbility(activeChar.id, upg.id, ab.id);
+
+                            abItem.appendChild(abPhotoWrapper);
+                            abItem.appendChild(abFileInput);
+                            abItem.appendChild(abInputs);
+                            abItem.appendChild(abDelBtn);
+
+                            lvlAbsContainer.appendChild(abItem);
+                        });
+                        item.appendChild(lvlAbsContainer);
+                    }
+
+                    upgList.appendChild(item);
+                });
+                editor.appendChild(upgList);
+
+                const addUpgContainer = document.createElement('div');
+                addUpgContainer.className = 'add-ability-container';
+                addUpgContainer.innerHTML = `
+                    <button class="add-ability-btn" onclick="addTDLevel(${activeChar.id})">
+                        <span class="plus-icon">+</span> Добавить уровень прокачки
+                    </button>
+                `;
+                editor.appendChild(addUpgContainer);
+
+            } else {
+                const abTitle = document.createElement('div');
+                abTitle.className = 'abilities-title';
+                abTitle.innerText = "Способности / Аномалии:";
+                editor.appendChild(abTitle);
+
+                const abList = document.createElement('div');
+                activeChar.abilities.forEach(ab => {
+                    const item = document.createElement('div');
+                    item.className = 'ability-item';
+
+                    const abPhotoWrapper = document.createElement('div');
+                    abPhotoWrapper.className = 'ability-photo-wrapper';
+
+                    const abUploader = document.createElement('div');
+                    abUploader.className = 'ability-image-uploader';
+                    abUploader.onclick = () => document.getElementById(`file-ab-${ab.id}`).click();
+
+                    const abFileInput = document.createElement('input');
+                    abFileInput.type = 'file';
+                    abFileInput.id = `file-ab-${ab.id}`;
+                    abFileInput.className = 'file-input';
+                    abFileInput.accept = 'image/*';
+                    abFileInput.onchange = (e) => handleAbilityImageUpload(e, activeChar.id, ab.id);
+
+                    if (ab.img) {
+                        abUploader.innerHTML = `<img src="${ab.img}" />`;
+                    } else {
+                        abUploader.innerHTML = `
+                            <div style="text-align:center;" class="uploader-placeholder">
+                                ${document.getElementById('defaultSmileSmall').innerHTML}
+                                <span style="font-size:6px; color:#444; margin-top:2px; display:block;">IMG</span>
+                            </div>
+                        `;
+                    }
+
+                    const abZoomBtn = document.createElement('button');
+                    abZoomBtn.className = 'zoom-btn ability-zoom-btn';
+                    abZoomBtn.innerText = 'ZOOM';
+                    abZoomBtn.disabled = !ab.img;
+                    abZoomBtn.onclick = () => zoomImage(ab.img);
+
+                    abPhotoWrapper.appendChild(abUploader);
+                    abPhotoWrapper.appendChild(abZoomBtn);
+
+                    const inputsDiv = document.createElement('div');
+                    inputsDiv.className = 'ability-inputs';
+
+                    const nameInput = document.createElement('input');
+                    nameInput.type = 'text';
+                    nameInput.className = 'ability-name-input';
+                    nameInput.placeholder = 'Сила / Название';
+                    nameInput.value = ab.name;
+                    nameInput.oninput = (e) => updateAbilityField(activeChar.id, ab.id, 'name', e.target.value);
+
+                    const descInput = document.createElement('textarea');
+                    descInput.className = 'ability-desc-input';
+                    descInput.placeholder = 'Характеристики способности...';
+                    descInput.value = ab.desc;
+                    descInput.oninput = (e) => updateAbilityField(activeChar.id, ab.id, 'desc', e.target.value);
+
+                    inputsDiv.appendChild(nameInput);
+                    inputsDiv.appendChild(descInput);
+
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'delete-ability-btn';
+                    delBtn.innerText = 'X';
+                    delBtn.onclick = () => deleteAbility(activeChar.id, ab.id);
+
+                    item.appendChild(abPhotoWrapper);
+                    item.appendChild(abFileInput);
+                    item.appendChild(inputsDiv);
+                    item.appendChild(delBtn);
+
+                    abList.appendChild(item);
+                });
+                editor.appendChild(abList);
+
+                const addAbContainer = document.createElement('div');
+                addAbContainer.className = 'add-ability-container';
+                addAbContainer.innerHTML = `
+                    <button class="add-ability-btn" onclick="addAbility(${activeChar.id})">
+                        <span class="plus-icon">+</span> Добавить способность
+                    </button>
+                `;
+                editor.appendChild(addAbContainer);
+            }
+
+            const actionsRow = document.createElement('div');
+            actionsRow.className = 'actions-row';
+            actionsRow.innerHTML = `
+                <button id="export-btn-${activeChar.id}" class="export-card-btn" onclick="exportCharacterSheet(${activeChar.id})">
+                    💾 СОХРАНИТЬ АНКЕТУ (СКАЧАТЬ PNG)
+                </button>
+            `;
+            editor.appendChild(actionsRow);
+
+            container.appendChild(editor);
+        }
+
+        // --- ДОП. ФУНКЦИИ ТОВЕР ДЕФЕНСА ---
+        function addTDLevel(charId) {
+            const char = characters.find(c => c.id === charId);
+            if (char && char.upgrades) {
+                const nextLevel = char.upgrades.length;
+                const prevLevelUpg = char.upgrades[nextLevel - 1];
+
+                const duplicatedAbilities = prevLevelUpg && prevLevelUpg.abilities ? 
+                    prevLevelUpg.abilities.map(ab => ({
+                        id: Date.now() + Math.random(),
+                        name: ab.name,
+                        desc: ab.desc,
+                        img: ab.img
+                    })) : [];
+
+                char.upgrades.push({
+                    id: Date.now(),
+                    level: nextLevel,
+                    name: `Прокачка ${nextLevel} ур.`,
+                    cost: 100 * nextLevel,
+                    damage: 10 + (5 * nextLevel),
+                    rate: 1.0,
+                    range: 6 + nextLevel,
+                    desc: "",
+                    seeCamo: prevLevelUpg ? prevLevelUpg.seeCamo : false,
+                    seeFlying: prevLevelUpg ? prevLevelUpg.seeFlying : false,
+                    abilities: duplicatedAbilities
+                });
+                saveData();
+                renderEditors();
+            }
+        }
+
+        function deleteTDLevel(charId, upgId) {
+            const char = characters.find(c => c.id === charId);
+            if (char && char.upgrades) {
+                char.upgrades = char.upgrades.filter(upg => upg.id !== upgId);
+                char.upgrades.forEach((upg, idx) => {
+                    upg.level = idx;
+                });
+                saveData();
+                renderEditors();
+            }
+        }
+
+        function updateTDStat(charId, upgId, statName, value) {
+            const char = characters.find(c => c.id === charId);
+            if (char && char.upgrades) {
+                const upg = char.upgrades.find(u => u.id === upgId);
+                if (upg) {
+                    upg[statName] = parseFloat(value) || 0;
+                    saveData();
+                    
+                    const dpsVal = upg.rate > 0 ? (upg.damage / upg.rate).toFixed(1) : "0";
+                    const dpsContainer = document.getElementById(`dps-${upgId}`);
+                    if (dpsContainer) dpsContainer.innerText = dpsVal;
+                }
+            }
+        }
+
+        function addTDLevelAbility(charId, upgId) {
+            const char = characters.find(c => c.id === charId);
+            if (char && char.upgrades) {
+                const upg = char.upgrades.find(u => u.id === upgId);
+                if (upg) {
+                    if (!upg.abilities) upg.abilities = [];
+                    upg.abilities.push({
+                        id: Date.now(),
+                        name: "",
+                        desc: "",
+                        img: ""
+                    });
+                    saveData();
+                    renderEditors();
+                }
+            }
+        }
+
+        function deleteTDLevelAbility(charId, upgId, abId) {
+            const char = characters.find(c => c.id === charId);
+            if (char && char.upgrades) {
+                const upg = char.upgrades.find(u => u.id === upgId);
+                if (upg && upg.abilities) {
+                    upg.abilities = upg.abilities.filter(ab => ab.id !== abId);
+                    saveData();
+                    renderEditors();
+                }
+            }
+        }
+
+        function updateTDLevelAbilityField(charId, upgId, abId, fieldName, value) {
+            const char = characters.find(c => c.id === charId);
+            if (char && char.upgrades) {
+                const upg = char.upgrades.find(u => u.id === upgId);
+                if (upg && upg.abilities) {
+                    const ab = upg.abilities.find(a => a.id === abId);
+                    if (ab) {
+                        ab[fieldName] = value;
+                        saveData();
+                    }
+                }
+            }
+        }
+
+        function handleTDLevelAbilityImageUpload(event, charId, upgId, abId) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 150;
+                    canvas.height = 150;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, 150, 150);
+                    
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    const char = characters.find(c => c.id === charId);
+                    if (char && char.upgrades) {
+                        const upg = char.upgrades.find(u => u.id === upgId);
+                        if (upg && upg.abilities) {
+                            const ab = upg.abilities.find(a => a.id === abId);
+                            if (ab) {
+                                ab.img = compressedDataUrl;
+                                saveData();
+                                renderEditors();
+                            }
+                        }
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateField(charId, fieldName, value) {
+            const char = characters.find(c => c.id === charId);
+            if (char) {
+                char[fieldName] = value;
+                saveData();
+                if (fieldName === 'name') {
+                    renderTabs();
+                }
+            }
+        }
+
+        function handleImageUpload(event, charId, fieldName) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 500;
+                    const scale = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scale;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    const char = characters.find(c => c.id === charId);
+                    if (char) {
+                        char[fieldName] = compressedDataUrl;
+                        saveData();
+                        renderEditors();
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function addAbility(charId) {
+            const char = characters.find(c => c.id === charId);
+            if (char) {
+                char.abilities.push({
+                    id: Date.now(),
+                    name: "",
+                    desc: "",
+                    img: ""
+                });
+                saveData();
+                renderEditors();
+            }
+        }
+
+        function deleteAbility(charId, abId) {
+            const char = characters.find(c => c.id === charId);
+            if (char) {
+                char.abilities = char.abilities.filter(ab => ab.id !== abId);
+                saveData();
+                renderEditors();
+            }
+        }
+
+        function updateAbilityField(charId, abId, fieldName, value) {
+            const char = characters.find(c => c.id === charId);
+            if (char) {
+                const ab = char.abilities.find(a => a.id === abId);
+                if (ab) {
+                    ab[fieldName] = value;
+                    saveData();
+                }
+            }
+        }
+
+        function handleAbilityImageUpload(event, charId, abId) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 150;
+                    canvas.height = 150;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, 150, 150);
+                    
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    const char = characters.find(c => c.id === charId);
+                    if (char) {
+                        const ab = char.abilities.find(a => a.id === abId);
+                        if (ab) {
+                            ab.img = compressedDataUrl;
+                            saveData();
+                            renderEditors();
+                        }
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        window.onload = loadData;
+    </script>
+</body>
+</html>
